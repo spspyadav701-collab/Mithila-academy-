@@ -1,11 +1,28 @@
-<div align="center">
+# AI Teacher - Android APK Project (Mithila Academy)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Package ID: com.mithilaacademy.spaai
+App Name: AI Teacher
 
-  <h1>Built with AI Studio</h2>
+## How to Build the APK:
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+### Option 1: Using Android Studio (Recommended)
+1. Unzip this folder.
+2. Open Android Studio -> Select "Open an existing project" -> Choose this folder.
+3. Click **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
+4. The generated APK will be in: `app/build/outputs/apk/debug/app-debug.apk`.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+### Option 2: Command Line / Terminal
+```bash
+chmod +x ./gradlew
+./gradlew assembleDebug
+```
+The APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
-</div>
+### Features inside this Android App:
+- Full-screen native immersive app
+- Mithila Academy AI Teacher Voice Assistant
+- Real-time Gemini Live voice streaming
+- Android Microphone permission pre-configured
+- Touch gesture customization (drag, pinch-to-resize, rotation)
+- LocalStorage layout persistence
+- Google Drive file browser & avatar integration
