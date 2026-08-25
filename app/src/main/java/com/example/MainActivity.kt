@@ -36,6 +36,7 @@ import com.example.ui.components.AdminPasscodeDialog
 import com.example.ui.components.AppBottomNav
 import com.example.ui.components.AppDrawerContent
 import com.example.ui.components.AppTopBar
+import com.example.ui.components.LanguageSelectionDialog
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.launch
@@ -66,6 +67,8 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
     val chatMessages by viewModel.chatMessages.collectAsState()
     val isAiThinking by viewModel.isAiThinking.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+    val showLanguageDialog by viewModel.showLanguageDialog.collectAsState()
 
     val isListening by viewModel.voiceManager.isListening.collectAsState()
     val isSpeaking by viewModel.voiceManager.isSpeaking.collectAsState()
@@ -150,6 +153,7 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
         drawerContent = {
             AppDrawerContent(
                 currentTab = currentTab,
+                currentLanguage = selectedLanguage,
                 onTabSelected = { tab ->
                     if (tab == AppTab.CREATE) {
                         viewModel.requestAdminAccess(AppTab.CREATE)
@@ -157,6 +161,7 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                         viewModel.setTab(tab)
                     }
                 },
+                onOpenLanguagePicker = { viewModel.showLanguagePicker(true) },
                 onCloseDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }
@@ -176,7 +181,8 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                     currentTab != AppTab.FREE_TEST &&
                     currentTab != AppTab.SOCIAL &&
                     currentTab != AppTab.DOWNLOADS &&
-                    currentTab != AppTab.NOTICE_BOARD
+                    currentTab != AppTab.NOTICE_BOARD &&
+                    currentTab != AppTab.SETTINGS
                 ) {
                     AppTopBar(
                         currentTab = currentTab,
@@ -395,6 +401,13 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                     AppTab.CREATE -> {
                         CreateScreen(viewModel = viewModel)
                     }
+
+                    AppTab.SETTINGS -> {
+                        SettingsScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.setTab(AppTab.HOME) }
+                        )
+                    }
                 }
 
                 // Video Detail Modal (if video tapped in feed)
@@ -422,7 +435,7 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                     }
                 }
 
-                // Master Admin Passcode Security Modal (Exclusive to SP Sir: spyadav9631473150@)
+                // Master Admin Passcode Security Modal (Cryptographic Verification)
                 if (showAdminPasscodeDialog) {
                     AdminPasscodeDialog(
                         passcodeInput = adminPasscodeInput,
@@ -430,6 +443,17 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                         onPasscodeChange = { viewModel.setAdminPasscodeInput(it) },
                         onVerify = { viewModel.verifyAdminPasscode() },
                         onDismiss = { viewModel.dismissAdminPasscodeDialog() }
+                    )
+                }
+
+                // Multilingual App Language Selection Modal
+                if (showLanguageDialog) {
+                    LanguageSelectionDialog(
+                        selectedLanguage = selectedLanguage,
+                        onLanguageSelected = { lang ->
+                            viewModel.setAppLanguage(lang)
+                        },
+                        onDismiss = { viewModel.showLanguagePicker(false) }
                     )
                 }
             }

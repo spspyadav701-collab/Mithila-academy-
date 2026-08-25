@@ -47,6 +47,7 @@ import com.example.R
 import com.example.data.local.*
 import com.example.ui.AiTeacherViewModel
 import com.example.ui.AppTab
+import com.example.ui.components.AdminVideoManagementView
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,6 +88,10 @@ fun CreateScreen(
     val allNotes by viewModel.allNotes.collectAsState()
     val allNotices by viewModel.allNotices.collectAsState()
     val allKnowledge by viewModel.allKnowledge.collectAsState()
+
+    val isUploadingVideo by viewModel.isUploadingVideo.collectAsState()
+    val videoUploadProgress by viewModel.videoUploadProgress.collectAsState()
+    val videoUploadStatusMessage by viewModel.videoUploadStatusMessage.collectAsState()
 
     val speechSpeed by viewModel.voiceManager.speechSpeed.collectAsState()
     val speechPitch by viewModel.voiceManager.speechPitch.collectAsState()
@@ -145,10 +150,36 @@ fun CreateScreen(
                     }
 
                     AdminWebSection.VIDEOS -> {
-                        AdminVideosManager(
+                        AdminVideoManagementView(
                             videos = videos,
-                            onPublishVideo = { title, desc, subject, duration ->
-                                viewModel.addNewVideo(title, desc, subject, duration)
+                            courses = allCourses,
+                            teacherName = teacherName,
+                            isUploading = isUploadingVideo,
+                            uploadProgress = videoUploadProgress,
+                            uploadStatusMessage = videoUploadStatusMessage,
+                            onSaveVideo = { id, title, desc, vUri, tUri, subj, cls, courseId, ch, teacher, dur, freePaid, pub, order ->
+                                viewModel.adminSaveVideo(
+                                    videoId = id,
+                                    title = title,
+                                    description = desc,
+                                    videoUriOrUrl = vUri,
+                                    thumbnailUriOrUrl = tUri,
+                                    subject = subj,
+                                    className = cls,
+                                    courseId = courseId,
+                                    chapter = ch,
+                                    teacher = teacher,
+                                    durationMinutes = dur,
+                                    freeOrPaid = freePaid,
+                                    isPublished = pub,
+                                    orderIndex = order
+                                )
+                            },
+                            onTogglePublish = { videoId, isPublished ->
+                                viewModel.toggleVideoPublishStatus(videoId, isPublished)
+                            },
+                            onUpdateOrder = { videoId, newOrder ->
+                                viewModel.updateVideoOrder(videoId, newOrder)
                             },
                             onDeleteVideo = { videoId ->
                                 viewModel.deleteVideo(videoId)

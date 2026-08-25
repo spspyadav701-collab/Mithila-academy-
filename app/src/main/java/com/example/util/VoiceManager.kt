@@ -10,7 +10,9 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Log
+import com.example.data.model.AppLanguage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +33,9 @@ class VoiceManager(private val context: Context) {
     private var listeningVisualizerJob: Job? = null
     private var lastRecognizedHypothesis: String = ""
 
+    private val _currentLanguage = MutableStateFlow(AppLanguage.HINDI)
+    val currentLanguage: StateFlow<AppLanguage> = _currentLanguage.asStateFlow()
+
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
@@ -46,7 +51,7 @@ class VoiceManager(private val context: Context) {
     private val _waveformBands = MutableStateFlow(List(16) { 0.1f })
     val waveformBands: StateFlow<List<Float>> = _waveformBands.asStateFlow()
 
-    private val prefs = context.getSharedPreferences("spa_ai_voice_prefs", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("ai_teacher_voice_prefs", Context.MODE_PRIVATE)
 
     private val _speechSpeed = MutableStateFlow(prefs.getFloat("key_speech_speed", 0.95f))
     val speechSpeed: StateFlow<Float> = _speechSpeed.asStateFlow()
@@ -120,11 +125,35 @@ class VoiceManager(private val context: Context) {
             textToSpeech = TextToSpeech(context.applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isTtsInitialized = true
-                    // Try setting Hindi first, fallback to English / Default
-                    val result = textToSpeech?.setLanguage(Locale("hi", "IN"))
+
+                    val hindiLocale = Locale("hi", "IN")
+                    val result = textToSpeech?.setLanguage(hindiLocale)
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        textToSpeech?.setLanguage(Locale.ENGLISH)
+                        textToSpeech?.setLanguage(Locale("hi"))
                     }
+
+                    // Attempt to select a natural Hindi female voice if available
+                    try {
+                        val availableVoices: Set<Voice>? = textToSpeech?.voices
+                        if (!availableVoices.isNullOrEmpty()) {
+                            val hindiVoices = availableVoices.filter {
+                                it.locale.language == "hi" || it.locale.toLanguageTag().startsWith("hi", ignoreCase = true)
+                            }
+                            val bestVoice = hindiVoices.firstOrNull { v ->
+                                v.name.contains("female", ignoreCase = true) ||
+                                        v.name.contains("f0", ignoreCase = true) ||
+                                        v.name.contains("hi-in-x-hie", ignoreCase = true) ||
+                                        v.name.contains("network", ignoreCase = true)
+                            } ?: hindiVoices.firstOrNull()
+
+                            if (bestVoice != null) {
+                                textToSpeech?.voice = bestVoice
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d("VoiceManager", "Voice auto-selection note: ${e.message}")
+                    }
+
                     textToSpeech?.setSpeechRate(_speechSpeed.value)
                     textToSpeech?.setPitch(_speechPitch.value)
                     textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -150,10 +179,10 @@ class VoiceManager(private val context: Context) {
                         }
                     })
 
-                    // Automatically speak opening greeting in Hindi when initialized
+                    // Automatically speak standard opening Hindi greeting when initialized
                     if (!hasSpokenInitialGreeting && _ttsEnabled.value) {
                         hasSpokenInitialGreeting = true
-                        speak("नमस्ते, मैं SPA AI Teacher हूँ। आपकी क्या मदद कर सकता हूँ?")
+                        speak("नमस्ते! मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।")
                     }
                 } else {
                     Log.w("VoiceManager", "TTS initialization failed code: $status")
@@ -161,6 +190,19 @@ class VoiceManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("VoiceManager", "TTS Exception: ${e.message}")
+        }
+    }
+
+    fun setLanguage(language: AppLanguage) {
+        _currentLanguage.value = language
+        prefs.edit().putString("key_selected_language", language.code).apply()
+        try {
+            val result = textToSpeech?.setLanguage(language.ttsLocale)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                textToSpeech?.setLanguage(Locale.getDefault())
+            }
+        } catch (e: Exception) {
+            Log.e("VoiceManager", "Error updating TTS language: ${e.message}")
         }
     }
 
@@ -198,25 +240,61 @@ class VoiceManager(private val context: Context) {
         }
     }
 
+    /**
+     * Cleans text thoroughly before sending to TTS engine:
+     * - Strips markdown (asterisks, hashtags, underscores, code tags)
+     * - Removes emojis, strange symbols, and math notation markers that cause stutter
+     * - Normalizes phonetics (SP -> एस पी, AI -> ए आई, etc.)
+     */
+    fun cleanTextForTts(text: String): String {
+        return text
+            // Remove code blocks and inline code
+            .replace(Regex("```[\\s\\S]*?```"), " ")
+            .replace(Regex("`[^`]*`"), " ")
+            // Remove markdown links [Title](url) -> Title
+            .replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
+            // Remove standalone URLs
+            .replace(Regex("https?://\\S+"), " ")
+            // Common math replacements for natural Hindi speech
+            .replace("\\frac{", " ")
+            .replace("\\sqrt{", " रूट ")
+            .replace("}", " ")
+            .replace("CO₂", " कार्बन डाइऑक्साइड ")
+            .replace("H₂O", " जल ")
+            .replace("O₂", " ऑक्सीजन ")
+            .replace("SO₄", " सल्फेट ")
+            .replace("FeSO₄", " फेरस सल्फेट ")
+            .replace("CuSO₄", " कॉपर सल्फेट ")
+            .replace("pH", " पीएच ")
+            // Identity phonetic sanitization
+            .replace(Regex("(?i)ESPA\\s*AI"), "AI टीचर")
+            .replace(Regex("(?i)S-P-A-I"), "AI टीचर")
+            .replace(Regex("(?i)S-P-A"), "SP")
+            .replace(Regex("(?i)SPA\\s*AI"), "AI टीचर")
+            .replace(Regex("(?i)\\bSPA\\b"), "SP")
+            // Strip markdown formatting symbols and bullet points
+            .replace(Regex("[*#_`~>•▪▫◆★▶➤•]"), " ")
+            // Strip emojis & unwanted special unicode characters
+            .replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}]"), " ")
+            .replace(Regex("[📚🔬📐🧪🧬🎯🏛️📖✍️💡❓✅❌🔊🎤⚡🎬📊📄📢🤖🎨]"), " ")
+            // Normalize spaces
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     fun speak(text: String, force: Boolean = false) {
         if (!_ttsEnabled.value && !force) return
         if (!isTtsInitialized || textToSpeech == null) return
 
         try {
-            // Strip markdown symbols for natural speech
-            val cleanText = text
-                .replace(Regex("[*#_`~>•]"), " ")
-                .replace(Regex("\\[.*?\\]"), " ")
-                .replace(Regex("\\(.*?\\)"), " ")
-                .replace(Regex("\\s+"), " ")
-                .trim()
+            val cleanText = cleanTextForTts(text)
 
             if (cleanText.isNotBlank()) {
                 stopSpeaking()
                 val params = Bundle().apply {
-                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "spa_speech_${System.currentTimeMillis()}")
+                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "teacher_speech_${System.currentTimeMillis()}")
                 }
-                textToSpeech?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, "spa_speech_id")
+                textToSpeech?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, "teacher_speech_id")
             }
         } catch (e: Exception) {
             Log.e("VoiceManager", "Speak error: ${e.message}")
@@ -244,7 +322,6 @@ class VoiceManager(private val context: Context) {
             try {
                 lastRecognizedHypothesis = ""
 
-                // Ensure a valid SpeechRecognizer instance is created using context or applicationContext
                 val recognizer = try {
                     SpeechRecognizer.createSpeechRecognizer(context)
                 } catch (e: Exception) {
@@ -296,7 +373,6 @@ class VoiceManager(private val context: Context) {
                             return
                         }
 
-                        // Handle speech scenarios gracefully
                         when (error) {
                             SpeechRecognizer.ERROR_NO_MATCH,
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
@@ -346,10 +422,12 @@ class VoiceManager(private val context: Context) {
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
 
+                val activeLanguage = _currentLanguage.value
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, activeLanguage.speechLocaleTag)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, activeLanguage.speechLocaleTag)
+                    putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
                     putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)

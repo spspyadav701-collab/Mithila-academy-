@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.local.CourseEntity
 import com.example.ui.AiTeacherViewModel
 import com.example.ui.AppTab
+import com.example.ui.components.StudentProgressTrackerCard
 import com.example.ui.theme.BluePrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,13 +34,14 @@ fun MyCoursesScreen(
     modifier: Modifier = Modifier
 ) {
     val enrolledCourses by viewModel.enrolledCourses.collectAsState()
+    val studentProgress by viewModel.studentSubjectProgress.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "My Courses",
+                        text = "My Courses & Progress",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -57,47 +59,79 @@ fun MyCoursesScreen(
         containerColor = Color(0xFFF7FAFD),
         modifier = modifier.testTag("my_courses_screen")
     ) { innerPadding ->
-        if (enrolledCourses.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.School,
-                        contentDescription = null,
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "You have not enrolled in any course yet.",
-                        color = Color(0xFF64748B),
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { viewModel.setTab(AppTab.ALL_COURSES) },
-                        colors = ButtonDefaults.buttonColors(containerColor = BluePrimary),
-                        shape = RoundedCornerShape(14.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            // Visual Learning Progress Tracker Card
+            item {
+                StudentProgressTrackerCard(
+                    progressList = studentProgress,
+                    onSubjectClick = { subject ->
+                        viewModel.setSelectedSubject(subject.subjectName)
+                    },
+                    onMarkCompleted = { subjectId ->
+                        viewModel.markModuleCompleted(subjectId)
+                    },
+                    onAskAiDoubt = { query ->
+                        viewModel.setTab(AppTab.AI_CHAT)
+                        viewModel.sendUserMessage(query)
+                    }
+                )
+            }
+
+            item {
+                Text(
+                    text = "Enrolled Courses",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                )
+            }
+
+            if (enrolledCourses.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Browse All Courses", fontWeight = FontWeight.Bold)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "You have not enrolled in any full batch yet.",
+                                color = Color(0xFF64748B),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = { viewModel.setTab(AppTab.ALL_COURSES) },
+                                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Browse All Courses", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
+            } else {
                 items(enrolledCourses, key = { it.courseId }) { course ->
                     EnrolledCourseCard(
                         course = course,

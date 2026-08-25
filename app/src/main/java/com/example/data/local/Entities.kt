@@ -34,7 +34,17 @@ data class VideoEntity(
     val createdAt: String,
     val subject: String,
     val durationMinutes: Int,
-    val resolution: String
+    val resolution: String,
+    val className: String = "Class 10",
+    val courseId: String = "course_phy_02",
+    val chapter: String = "Chapter 1",
+    val teacher: String = "SP Sir",
+    val duration: String = "42 min",
+    val freeOrPaid: String = "Free",
+    val isPaid: Boolean = false,
+    val isPublished: Boolean = true,
+    val updatedAt: String = "2026-08-25T10:00:00Z",
+    val orderIndex: Int = 1
 )
 
 @Entity(tableName = "subscriptions")
@@ -134,11 +144,23 @@ interface UserDao {
 
 @Dao
 interface VideoDao {
-    @Query("SELECT * FROM videos ORDER BY createdAt DESC")
+    @Query("SELECT * FROM videos ORDER BY orderIndex ASC, createdAt DESC")
     fun getAllVideos(): Flow<List<VideoEntity>>
 
-    @Query("SELECT * FROM videos WHERE teacherId = :teacherId ORDER BY createdAt DESC")
+    @Query("SELECT * FROM videos WHERE isPublished = 1 ORDER BY orderIndex ASC, createdAt DESC")
+    fun getPublishedVideos(): Flow<List<VideoEntity>>
+
+    @Query("SELECT * FROM videos WHERE teacherId = :teacherId ORDER BY orderIndex ASC, createdAt DESC")
     fun getVideosByTeacher(teacherId: String): Flow<List<VideoEntity>>
+
+    @Query("SELECT * FROM videos WHERE courseId = :courseId ORDER BY orderIndex ASC, createdAt DESC")
+    fun getVideosByCourse(courseId: String): Flow<List<VideoEntity>>
+
+    @Query("SELECT * FROM videos WHERE subject = :subject AND isPublished = 1 ORDER BY orderIndex ASC, createdAt DESC")
+    fun getVideosBySubject(subject: String): Flow<List<VideoEntity>>
+
+    @Query("SELECT * FROM videos WHERE isPaid = 0 AND isPublished = 1 ORDER BY orderIndex ASC, createdAt DESC")
+    fun getFreePublishedVideos(): Flow<List<VideoEntity>>
 
     @Query("SELECT * FROM videos WHERE videoId = :videoId LIMIT 1")
     fun getVideoById(videoId: String): Flow<VideoEntity?>
@@ -148,6 +170,15 @@ interface VideoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVideos(videos: List<VideoEntity>)
+
+    @Update
+    suspend fun updateVideo(video: VideoEntity)
+
+    @Query("UPDATE videos SET isPublished = :isPublished, updatedAt = :updatedAt WHERE videoId = :videoId")
+    suspend fun updatePublishStatus(videoId: String, isPublished: Boolean, updatedAt: String)
+
+    @Query("UPDATE videos SET orderIndex = :newOrder, updatedAt = :updatedAt WHERE videoId = :videoId")
+    suspend fun updateVideoOrder(videoId: String, newOrder: Int, updatedAt: String)
 
     @Query("DELETE FROM videos WHERE videoId = :videoId")
     suspend fun deleteVideo(videoId: String)

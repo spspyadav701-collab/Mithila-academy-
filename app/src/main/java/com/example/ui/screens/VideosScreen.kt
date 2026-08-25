@@ -60,12 +60,15 @@ fun VideosScreen(
     val subjects = listOf("All", "Physics", "Mathematics", "Biology", "Chemistry", "BPSC & Bihar Police")
 
     val filteredVideos = videos.filter { video ->
+        val isPublished = video.isPublished
         val matchesSubject = (selectedSubject == "All" || video.subject.contains(selectedSubject, ignoreCase = true))
         val matchesSearch = searchQuery.isBlank() || 
                 video.title.contains(searchQuery, ignoreCase = true) || 
                 video.description.contains(searchQuery, ignoreCase = true) ||
-                video.teacherName.contains(searchQuery, ignoreCase = true)
-        matchesSubject && matchesSearch
+                video.teacherName.contains(searchQuery, ignoreCase = true) ||
+                video.chapter.contains(searchQuery, ignoreCase = true) ||
+                video.className.contains(searchQuery, ignoreCase = true)
+        isPublished && matchesSubject && matchesSearch
     }
 
     Column(
@@ -301,6 +304,53 @@ fun YouTubeStyleVideoCard(
 
             // 2. Video Details & Title
             Column(modifier = Modifier.padding(14.dp)) {
+                // Metadata chips: Class, Chapter & Free/Paid status
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (video.isPaid) RedLive.copy(alpha = 0.15f) else Color(0xFF16A34A).copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = if (video.isPaid) "PAID" else "FREE",
+                            color = if (video.isPaid) RedLive else Color(0xFF16A34A),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = BluePrimary.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = video.className,
+                            color = BluePrimary,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 9.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Text(
+                        text = video.chapter,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.titleMedium.copy(

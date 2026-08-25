@@ -1,7 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">AI Teacher</string>
-    <string name="title_activity_main">AI Teacher</string>
-    <string name="package_name">com.mithilaacademy.spaai</string>
-    <string name="custom_url_scheme">com.mithilaacademy.spaai</string>
+    <string name="app_tagline">Mithila Academy • By SP</string>
+    <string name="welcome_greeting">नमस्ते, मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।</string>
 </resources>

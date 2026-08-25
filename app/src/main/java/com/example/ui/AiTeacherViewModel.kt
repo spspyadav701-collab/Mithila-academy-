@@ -18,8 +18,10 @@ import com.example.data.local.LiveStreamEntity
 import com.example.data.local.SubscriptionEntity
 import com.example.data.local.UserEntity
 import com.example.data.local.VideoEntity
+import com.example.data.model.AppLanguage
 import com.example.data.repository.ChatSessionRepository
 import com.example.data.service.GeminiService
+import com.example.util.LanguageStrings
 import com.example.util.SecurityHelper
 import com.example.util.VoiceManager
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +53,8 @@ enum class AppTab(val title: String) {
     AI_CHAT("AI Voice Teacher"),
     LIVE_CLASS("Live Class Room"),
     VIDEOS("Videos"),
-    CREATE("Teacher Panel")
+    CREATE("Teacher Panel"),
+    SETTINGS("Settings")
 }
 
 data class ActiveTestState(
@@ -64,9 +67,25 @@ data class ActiveTestState(
     val remainingSeconds: Int = 900
 )
 
+data class SubjectProgress(
+    val id: String,
+    val subjectName: String,
+    val hindiName: String,
+    val completedChapters: Int,
+    val totalChapters: Int,
+    val recentTopic: String,
+    val colorHex: Long
+) {
+    val progressFraction: Float
+        get() = if (totalChapters > 0) (completedChapters.toFloat() / totalChapters).coerceIn(0f, 1f) else 0f
+
+    val percentage: Int
+        get() = (progressFraction * 100).toInt()
+}
+
 data class UiMessage(
     val id: String = UUID.randomUUID().toString(),
-    val sender: String, // "SPA AI TEACHER" or "You" or student name
+    val sender: String, // "AI Teacher" or "You" or student name
     val role: String, // "ai", "user", "teacher", "student"
     val text: String,
     val timestamp: String = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
@@ -113,6 +132,27 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     val teacherQualification: StateFlow<String> = _teacherQualification.asStateFlow()
 
     private val brandingPrefs = application.getSharedPreferences("spa_branding_prefs", Context.MODE_PRIVATE)
+    private val languagePrefs = application.getSharedPreferences("spa_language_prefs", Context.MODE_PRIVATE)
+
+    // Active App Language Preference
+    private val _selectedLanguage = MutableStateFlow(
+        AppLanguage.fromCode(languagePrefs.getString("app_language_code", "hi"))
+    )
+    val selectedLanguage: StateFlow<AppLanguage> = _selectedLanguage.asStateFlow()
+
+    private val _showLanguageDialog = MutableStateFlow(false)
+    val showLanguageDialog: StateFlow<Boolean> = _showLanguageDialog.asStateFlow()
+
+    fun showLanguagePicker(show: Boolean) {
+        _showLanguageDialog.value = show
+    }
+
+    fun setAppLanguage(language: AppLanguage) {
+        _selectedLanguage.value = language
+        languagePrefs.edit().putString("app_language_code", language.code).apply()
+        voiceManager.setLanguage(language)
+        _statusMessage.value = LanguageStrings.getLanguageChangeSuccess(language)
+    }
 
     // Customizable Full-Screen AI Doubts Configuration (Owner/Admin Editable)
     private val _mainTitle = MutableStateFlow(brandingPrefs.getString("custom_main_title", "MITHILA ACADEMY") ?: "MITHILA ACADEMY")
@@ -124,7 +164,7 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     private val _customMessage = MutableStateFlow(brandingPrefs.getString("custom_message", "...") ?: "...")
     val customMessage: StateFlow<String> = _customMessage.asStateFlow()
 
-    private val _aiTeacherTitle = MutableStateFlow(brandingPrefs.getString("custom_ai_title", "SPA AI Teacher") ?: "SPA AI Teacher")
+    private val _aiTeacherTitle = MutableStateFlow(brandingPrefs.getString("custom_ai_title", "AI Teacher") ?: "AI Teacher")
     val aiTeacherTitle: StateFlow<String> = _aiTeacherTitle.asStateFlow()
 
     private val _customBgImageUri = MutableStateFlow<String?>(brandingPrefs.getString("custom_bg_image_uri", null))
@@ -211,6 +251,10 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     private val _selectedSubject = MutableStateFlow("All")
     val selectedSubject: StateFlow<String> = _selectedSubject.asStateFlow()
 
+    fun setSelectedSubject(subject: String) {
+        _selectedSubject.value = subject
+    }
+
     // Notes Search and Filter
     private val _notesSearchQuery = MutableStateFlow("")
     val notesSearchQuery: StateFlow<String> = _notesSearchQuery.asStateFlow()
@@ -248,14 +292,77 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     private val _chatMessages = MutableStateFlow<List<UiMessage>>(
         listOf(
             UiMessage(
-                sender = "SPA AI Teacher",
+                sender = "AI Teacher",
                 role = "ai",
-                text = "नमस्ते, मैं SPA AI Teacher हूँ। आपकी क्या मदद कर सकता हूँ?",
+                text = "मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।",
                 isAi = true
             )
         )
     )
     val chatMessages: StateFlow<List<UiMessage>> = _chatMessages.asStateFlow()
+
+    // --- Visual Learning Progress Tracker State ---
+    private val _studentSubjectProgress = MutableStateFlow<List<SubjectProgress>>(
+        listOf(
+            SubjectProgress(
+                id = "prog_physics",
+                subjectName = "Physics",
+                hindiName = "भौतिक विज्ञान",
+                completedChapters = 12,
+                totalChapters = 16,
+                recentTopic = "प्रकाश का परावर्तन एवं अपवर्तन",
+                colorHex = 0xFF1E88E5
+            ),
+            SubjectProgress(
+                id = "prog_math",
+                subjectName = "Mathematics",
+                hindiName = "गणित",
+                completedChapters = 14,
+                totalChapters = 18,
+                recentTopic = "त्रिकोणमिति सर्वसमिकाएं",
+                colorHex = 0xFF43A047
+            ),
+            SubjectProgress(
+                id = "prog_chemistry",
+                subjectName = "Chemistry",
+                hindiName = "रसायन विज्ञान",
+                completedChapters = 9,
+                totalChapters = 14,
+                recentTopic = "अम्ल, क्षार एवं लवण (pH Scale)",
+                colorHex = 0xFFE53935
+            ),
+            SubjectProgress(
+                id = "prog_biology",
+                subjectName = "Biology",
+                hindiName = "जीव विज्ञान",
+                completedChapters = 11,
+                totalChapters = 13,
+                recentTopic = "मानव हृदय एवं परिसंचरण तंत्र",
+                colorHex = 0xFF8E24AA
+            ),
+            SubjectProgress(
+                id = "prog_gk",
+                subjectName = "General Knowledge",
+                hindiName = "सामान्य ज्ञान & BPSC",
+                completedChapters = 19,
+                totalChapters = 25,
+                recentTopic = "बिहार का इतिहास एवं भूगोल",
+                colorHex = 0xFFFB8C00
+            )
+        )
+    )
+    val studentSubjectProgress: StateFlow<List<SubjectProgress>> = _studentSubjectProgress.asStateFlow()
+
+    fun markModuleCompleted(subjectId: String) {
+        _studentSubjectProgress.value = _studentSubjectProgress.value.map { item ->
+            if (item.id == subjectId && item.completedChapters < item.totalChapters) {
+                item.copy(completedChapters = item.completedChapters + 1)
+            } else {
+                item
+            }
+        }
+        _statusMessage.value = "🎯 अध्याय प्रगति अपडेट की गई!"
+    }
 
     // Loading / Thinking state for AI
     private val _isAiThinking = MutableStateFlow(false)
@@ -321,6 +428,16 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     // Selected Video for playback details
     private val _selectedVideo = MutableStateFlow<VideoEntity?>(null)
     val selectedVideo: StateFlow<VideoEntity?> = _selectedVideo.asStateFlow()
+
+    // Video Upload & Cloud Storage Simulation State
+    private val _isUploadingVideo = MutableStateFlow(false)
+    val isUploadingVideo: StateFlow<Boolean> = _isUploadingVideo.asStateFlow()
+
+    private val _videoUploadProgress = MutableStateFlow(0f)
+    val videoUploadProgress: StateFlow<Float> = _videoUploadProgress.asStateFlow()
+
+    private val _videoUploadStatusMessage = MutableStateFlow("")
+    val videoUploadStatusMessage: StateFlow<String> = _videoUploadStatusMessage.asStateFlow()
 
     // --- ROLE-BASED ACCESS CONTROL (RBAC) & ADMIN AUTHENTICATION ---
     private val _currentUserRole = MutableStateFlow(UserRole.STUDENT)
@@ -911,7 +1028,7 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
                 )
 
                 val aiMsg = UiMessage(
-                    sender = "SPA AI TEACHER",
+                    sender = "AI Teacher",
                     role = "ai",
                     text = aiResponse,
                     isAi = true,
@@ -1398,30 +1515,158 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
         subject: String,
         durationMinutes: Int
     ) {
+        adminSaveVideo(
+            videoId = null,
+            title = title,
+            description = description,
+            videoUriOrUrl = "",
+            thumbnailUriOrUrl = "",
+            subject = subject,
+            className = "Class 10",
+            courseId = "crs_phy_10",
+            chapter = "Chapter 1",
+            teacher = _teacherProfileName.value.ifBlank { "SP Sir (Mithila Academy)" },
+            durationMinutes = durationMinutes,
+            freeOrPaid = "Free",
+            isPublished = true,
+            orderIndex = 1
+        )
+    }
+
+    fun adminSaveVideo(
+        videoId: String?,
+        title: String,
+        description: String,
+        videoUriOrUrl: String,
+        thumbnailUriOrUrl: String,
+        subject: String,
+        className: String,
+        courseId: String,
+        chapter: String,
+        teacher: String,
+        durationMinutes: Int,
+        freeOrPaid: String,
+        isPublished: Boolean,
+        orderIndex: Int,
+        resolution: String = "1080p FHD",
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        if (_currentUserRole.value != UserRole.ADMIN) {
+            _statusMessage.value = "Permission Denied: Only Admin can upload or edit videos."
+            onComplete(false)
+            return
+        }
         if (title.isBlank()) {
             _statusMessage.value = "Video title is required."
+            onComplete(false)
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _isUploadingVideo.value = true
+            _videoUploadProgress.value = 0.1f
+            _videoUploadStatusMessage.value = "Connecting to Cloud Storage..."
+            kotlinx.coroutines.delay(120)
+
+            _videoUploadProgress.value = 0.35f
+            _videoUploadStatusMessage.value = "Uploading video file to videos/$courseId/${chapter.replace(" ", "_")}/..."
+            kotlinx.coroutines.delay(180)
+
+            _videoUploadProgress.value = 0.70f
+            _videoUploadStatusMessage.value = "Generating video thumbnails & HLS chunks..."
+            kotlinx.coroutines.delay(150)
+
+            _videoUploadProgress.value = 0.90f
+            _videoUploadStatusMessage.value = "Saving video metadata to database..."
+            kotlinx.coroutines.delay(100)
+
+            val effectiveId = videoId?.ifBlank { null } ?: "vid_${UUID.randomUUID()}"
+            val currentTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date())
+            val effectiveTeacher = teacher.ifBlank { _teacherProfileName.value.ifBlank { "SP Sir (Mithila Academy)" } }
+            val isPaidBool = freeOrPaid.equals("Paid", ignoreCase = true)
+            val durationText = "${durationMinutes.coerceAtLeast(1)} mins"
+
+            val finalVideoUrl = if (videoUriOrUrl.isNotBlank()) {
+                videoUriOrUrl
+            } else {
+                "https://storage.googleapis.com/mithila-academy-bucket/videos/$courseId/$effectiveId/video.mp4"
+            }
+
+            val finalThumbnailUrl = if (thumbnailUriOrUrl.isNotBlank()) {
+                thumbnailUriOrUrl
+            } else {
+                "https://storage.googleapis.com/mithila-academy-bucket/thumbnails/$courseId/$effectiveId/thumbnail.jpg"
+            }
+
+            val videoEntity = VideoEntity(
+                videoId = effectiveId,
+                teacherId = "teacher_sp_01",
+                teacherName = effectiveTeacher,
+                teacherProfilePic = "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200",
+                title = title.trim(),
+                description = description.trim().ifBlank { "Comprehensive educational video lecture by Mithila Academy." },
+                videoUrl = finalVideoUrl,
+                thumbnailUrl = finalThumbnailUrl,
+                views = if (videoId == null) 1 else 100,
+                likes = if (videoId == null) 0 else 10,
+                isLiked = false,
+                createdAt = currentTime,
+                subject = subject.trim(),
+                durationMinutes = durationMinutes.coerceAtLeast(5),
+                resolution = resolution,
+                className = className.trim().ifBlank { "Class 10" },
+                courseId = courseId.trim().ifBlank { "crs_general" },
+                chapter = chapter.trim().ifBlank { "Chapter 1" },
+                teacher = effectiveTeacher,
+                duration = durationText,
+                freeOrPaid = if (isPaidBool) "Paid" else "Free",
+                isPaid = isPaidBool,
+                isPublished = isPublished,
+                updatedAt = currentTime,
+                orderIndex = orderIndex.coerceAtLeast(1)
+            )
+
+            db.videoDao().insertVideo(videoEntity)
+
+            _videoUploadProgress.value = 1.0f
+            _videoUploadStatusMessage.value = "Upload complete! Video published."
+            kotlinx.coroutines.delay(80)
+
+            _isUploadingVideo.value = false
+            _videoUploadProgress.value = 0f
+            _videoUploadStatusMessage.value = ""
+
+            _statusMessage.value = if (videoId == null) {
+                "✅ Video '${title.take(25)}' uploaded successfully!"
+            } else {
+                "✅ Video '${title.take(25)}' updated successfully!"
+            }
+            onComplete(true)
+        }
+    }
+
+    fun toggleVideoPublishStatus(videoId: String, isCurrentlyPublished: Boolean) {
+        if (_currentUserRole.value != UserRole.ADMIN) {
+            _statusMessage.value = "Permission Denied: Only Admin can publish/unpublish videos."
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val newVideo = VideoEntity(
-                videoId = "vid_${UUID.randomUUID()}",
-                teacherId = "teacher_sp_01",
-                teacherName = _teacherProfileName.value.ifBlank { "SP Sir (Mithila Academy)" },
-                teacherProfilePic = "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200",
-                title = title.trim(),
-                description = description.trim().ifEmpty { "Educational video lecture by Mithila Academy." },
-                videoUrl = "https://storage.googleapis.com/bucket_name/videos/custom_lecture.mp4",
-                thumbnailUrl = "",
-                views = 1,
-                likes = 0,
-                isLiked = false,
-                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date()),
-                subject = subject.trim(),
-                durationMinutes = durationMinutes.coerceAtLeast(5),
-                resolution = "1080p FHD"
-            )
-            db.videoDao().insertVideo(newVideo)
-            _statusMessage.value = "✅ New Video Lecture published!"
+            val newStatus = !isCurrentlyPublished
+            val currentTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date())
+            db.videoDao().updatePublishStatus(videoId, newStatus, currentTime)
+            _statusMessage.value = if (newStatus) "📢 Video lecture is now PUBLISHED for students!" else "🔒 Video lecture moved to DRAFT / UNPUBLISHED."
+        }
+    }
+
+    fun updateVideoOrder(videoId: String, newOrder: Int) {
+        if (_currentUserRole.value != UserRole.ADMIN) {
+            _statusMessage.value = "Permission Denied: Only Admin can reorder videos."
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date())
+            db.videoDao().updateVideoOrder(videoId, newOrder, currentTime)
+            _statusMessage.value = "🔢 Video order updated to #$newOrder"
         }
     }
 

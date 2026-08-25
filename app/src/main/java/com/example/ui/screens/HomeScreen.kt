@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,14 +26,18 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.ui.AiTeacherViewModel
 import com.example.ui.AppTab
+import com.example.ui.components.StudentProgressTrackerCard
 
 @Composable
 fun HomeScreen(
@@ -45,6 +50,7 @@ fun HomeScreen(
     val showNotificationsDialog by viewModel.showNotificationsDialog.collectAsState()
     val notices by viewModel.allNotices.collectAsState()
     val liveStreams by viewModel.liveStreams.collectAsState()
+    val studentProgress by viewModel.studentSubjectProgress.collectAsState()
 
     val scrollState = rememberScrollState()
 
@@ -60,15 +66,26 @@ fun HomeScreen(
         label = "pulse_alpha"
     )
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7FAFD))
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("home_screen")
     ) {
-        // --- 1. TOP HEADER SECTION ---
+        // App's Home Screen Background Photo
+        Image(
+            painter = painterResource(id = R.drawable.img_home_wallpaper),
+            contentDescription = "Mithila Academy Background",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            // --- 1. TOP HEADER SECTION ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,30 +166,81 @@ fun HomeScreen(
                 }
             }
 
-            // Right: Notification Bell
-            Box {
-                IconButton(
-                    onClick = { viewModel.toggleNotificationsDialog(true) },
+            // Right: Actions (Language Quick Switcher, Notification Bell & Settings)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Language Switcher Quick Pill
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 2.dp,
                     modifier = Modifier
-                        .size(44.dp)
-                        .testTag("btn_notifications")
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { viewModel.showLanguagePicker(true) }
+                        .testTag("btn_home_language_picker")
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF1E293B),
-                        modifier = Modifier.size(26.dp)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Language",
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "भाषा",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                    }
+                }
+
+                // Notification Bell
+                Box {
+                    IconButton(
+                        onClick = { viewModel.toggleNotificationsDialog(true) },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .testTag("btn_notifications")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Notifications,
+                            contentDescription = "Notifications",
+                            tint = Color(0xFF1E293B),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    // Notification unread indicator
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444))
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-4).dp, y = 4.dp)
                     )
                 }
-                // Notification unread indicator
-                Box(
+
+                // Settings Shortcut
+                IconButton(
+                    onClick = { viewModel.setTab(AppTab.SETTINGS) },
                     modifier = Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFEF4444))
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-8).dp, y = 8.dp)
-                )
+                        .size(38.dp)
+                        .testTag("btn_home_settings")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Color(0xFF1E293B),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 
@@ -458,6 +526,23 @@ fun HomeScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(22.dp))
+
+        // --- 5. VISUAL LEARNING PROGRESS TRACKER ---
+        StudentProgressTrackerCard(
+            progressList = studentProgress,
+            onSubjectClick = { subject ->
+                viewModel.setSelectedSubject(subject.subjectName)
+            },
+            onMarkCompleted = { subjectId ->
+                viewModel.markModuleCompleted(subjectId)
+            },
+            onAskAiDoubt = { query ->
+                viewModel.setTab(AppTab.AI_CHAT)
+                viewModel.sendUserMessage(query)
+            }
+        )
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 
@@ -592,6 +677,7 @@ fun HomeScreen(
                 }
             }
         }
+    }
     }
 }
 

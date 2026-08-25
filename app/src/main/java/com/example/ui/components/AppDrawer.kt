@@ -21,13 +21,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AppLanguage
 import com.example.ui.AppTab
 import com.example.ui.theme.BluePrimary
+import com.example.util.LanguageStrings
 
 @Composable
 fun AppDrawerContent(
     currentTab: AppTab,
+    currentLanguage: AppLanguage = AppLanguage.HINDI,
     onTabSelected: (AppTab) -> Unit,
+    onOpenLanguagePicker: () -> Unit = {},
     onCloseDrawer: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -88,28 +92,60 @@ fun AppDrawerContent(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.1f)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White.copy(alpha = 0.1f),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = "Student ID: SPA-2026-101",
-                                color = Color(0xFFE2E8F0),
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = "Active",
-                                color = Color(0xFF4ADE80),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SPA-2026-101",
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = "Active",
+                                    color = Color(0xFF4ADE80),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Quick Language Switcher Button in Header
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = BluePrimary.copy(alpha = 0.35f),
+                            modifier = Modifier
+                                .clickable {
+                                    onOpenLanguagePicker()
+                                    onCloseDrawer()
+                                }
+                                .testTag("drawer_language_button")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = currentLanguage.flagEmoji, fontSize = 12.sp)
+                                Text(
+                                    text = currentLanguage.nativeName,
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -131,11 +167,13 @@ fun AppDrawerContent(
                 DrawerItemData("All Video Lectures", Icons.Default.VideoLibrary, AppTab.VIDEOS),
                 DrawerItemData("Downloads", Icons.Default.CloudDownload, AppTab.DOWNLOADS),
                 DrawerItemData("Notice Board", Icons.Default.Campaign, AppTab.NOTICE_BOARD),
-                DrawerItemData("Teacher Admin Panel", Icons.Default.AdminPanelSettings, AppTab.CREATE)
+                DrawerItemData("Teacher Admin Panel", Icons.Default.AdminPanelSettings, AppTab.CREATE),
+                DrawerItemData("Settings & Language", Icons.Default.Settings, AppTab.SETTINGS)
             )
 
             navItems.forEach { item ->
                 val isSelected = currentTab == item.tab
+                val localizedTitle = LanguageStrings.getTabTitle(item.title, currentLanguage)
                 NavigationDrawerItem(
                     icon = {
                         Icon(
@@ -147,7 +185,7 @@ fun AppDrawerContent(
                     },
                     label = {
                         Text(
-                            text = item.title,
+                            text = localizedTitle,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp,
                             color = if (isSelected) BluePrimary else Color(0xFF1E293B)

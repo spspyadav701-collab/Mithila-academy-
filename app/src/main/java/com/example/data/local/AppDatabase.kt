@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         NoticeEntity::class,
         SocialPostEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -134,7 +134,17 @@ abstract class AppDatabase : RoomDatabase() {
                     createdAt = "2026-08-22T08:00:00Z",
                     subject = "Physics",
                     durationMinutes = 42,
-                    resolution = "1080p FHD"
+                    resolution = "1080p FHD",
+                    className = "Class 10",
+                    courseId = "crs_phy_10",
+                    chapter = "Chapter 1: Light & Optics",
+                    teacher = "SP Sir (Mithila Academy)",
+                    duration = "42 mins",
+                    freeOrPaid = "Free",
+                    isPaid = false,
+                    isPublished = true,
+                    updatedAt = "2026-08-22T08:00:00Z",
+                    orderIndex = 1
                 ),
                 VideoEntity(
                     videoId = "vid_math_002",
@@ -151,7 +161,17 @@ abstract class AppDatabase : RoomDatabase() {
                     createdAt = "2026-08-21T14:30:00Z",
                     subject = "Mathematics",
                     durationMinutes = 35,
-                    resolution = "1080p FHD"
+                    resolution = "1080p FHD",
+                    className = "Class 12",
+                    courseId = "crs_math_12",
+                    chapter = "Chapter 3: Trigonometric Shortcuts",
+                    teacher = "SP Sir (Mithila Academy)",
+                    duration = "35 mins",
+                    freeOrPaid = "Free",
+                    isPaid = false,
+                    isPublished = true,
+                    updatedAt = "2026-08-21T14:30:00Z",
+                    orderIndex = 2
                 ),
                 VideoEntity(
                     videoId = "vid_gk_003",
@@ -168,7 +188,17 @@ abstract class AppDatabase : RoomDatabase() {
                     createdAt = "2026-08-20T16:00:00Z",
                     subject = "BPSC & Bihar Police",
                     durationMinutes = 55,
-                    resolution = "4K Ultra"
+                    resolution = "4K Ultra",
+                    className = "Competitive / BPSC",
+                    courseId = "crs_bpsc_01",
+                    chapter = "Chapter 2: Bihar Special History",
+                    teacher = "SP Sir",
+                    duration = "55 mins",
+                    freeOrPaid = "Free",
+                    isPaid = false,
+                    isPublished = true,
+                    updatedAt = "2026-08-20T16:00:00Z",
+                    orderIndex = 3
                 ),
                 VideoEntity(
                     videoId = "vid_bio_004",
@@ -185,7 +215,17 @@ abstract class AppDatabase : RoomDatabase() {
                     createdAt = "2026-08-19T11:00:00Z",
                     subject = "Biology",
                     durationMinutes = 38,
-                    resolution = "1080p FHD"
+                    resolution = "1080p FHD",
+                    className = "Class 12",
+                    courseId = "crs_bio_12",
+                    chapter = "Chapter 4: Human Physiology",
+                    teacher = "Dr. Priya Sharma",
+                    duration = "38 mins",
+                    freeOrPaid = "Free",
+                    isPaid = false,
+                    isPublished = true,
+                    updatedAt = "2026-08-19T11:00:00Z",
+                    orderIndex = 4
                 )
             )
             database.videoDao().insertVideos(initialVideos)
