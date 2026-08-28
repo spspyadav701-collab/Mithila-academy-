@@ -32,6 +32,7 @@ fun AppDrawerContent(
     currentLanguage: AppLanguage = AppLanguage.HINDI,
     onTabSelected: (AppTab) -> Unit,
     onOpenLanguagePicker: () -> Unit = {},
+    onDownloadApk: () -> Unit = {},
     onCloseDrawer: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -209,8 +210,59 @@ fun AppDrawerContent(
             HorizontalDivider(color = Color(0xFFF1F5F9))
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Download APK Action Button in Drawer
+            Box(modifier = Modifier.padding(horizontal = 14.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFEFF6FF),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            onDownloadApk()
+                            onCloseDrawer()
+                        }
+                        .testTag("btn_drawer_download_apk")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Android,
+                            contentDescription = "Download APK",
+                            tint = BluePrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Download APK",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = BluePrimary
+                            )
+                            Text(
+                                text = "Latest v2.6.0 Pro Release",
+                                fontSize = 10.sp,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = BluePrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // App branding footer
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
                 Text(
                     text = "SPA AI Teacher • v2.6.0",
                     fontSize = 11.sp,

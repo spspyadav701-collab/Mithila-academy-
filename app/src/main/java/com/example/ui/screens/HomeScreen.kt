@@ -34,9 +34,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.ui.AiTeacherViewModel
 import com.example.ui.AppTab
+import com.example.ui.components.ApkDownloadCard
 import com.example.ui.components.StudentProgressTrackerCard
 
 @Composable
@@ -69,14 +71,16 @@ fun HomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(Color(0xFFF7FAFD))
             .testTag("home_screen")
     ) {
-        // App's Home Screen Background Photo
-        Image(
-            painter = painterResource(id = R.drawable.img_home_wallpaper),
+        // App's Home Screen Background Wallpaper
+        AsyncImage(
+            model = R.drawable.img_home_wallpaper,
             contentDescription = "Mithila Academy Background",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
         )
 
         Column(
@@ -541,6 +545,14 @@ fun HomeScreen(
                 viewModel.setTab(AppTab.AI_CHAT)
                 viewModel.sendUserMessage(query)
             }
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 6. APP DOWNLOAD CARD (DOWNLOAD REAL APK) ---
+        ApkDownloadCard(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(24.dp))

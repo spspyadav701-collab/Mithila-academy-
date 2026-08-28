@@ -33,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.ui.AppTab
 import com.example.ui.theme.*
@@ -92,9 +93,10 @@ fun AppTopBar(
                         .border(1.dp, BlueSecondary.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_app_icon),
+                    AsyncImage(
+                        model = R.drawable.img_app_icon,
                         contentDescription = "SPA Logo",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)

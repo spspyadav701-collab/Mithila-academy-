@@ -37,6 +37,7 @@ import com.example.ui.components.AppBottomNav
 import com.example.ui.components.AppDrawerContent
 import com.example.ui.components.AppTopBar
 import com.example.ui.components.LanguageSelectionDialog
+import com.example.ui.components.ApkDownloadDialog
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.launch
@@ -69,6 +70,8 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
     val statusMessage by viewModel.statusMessage.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     val showLanguageDialog by viewModel.showLanguageDialog.collectAsState()
+    val showApkDownloadDialog by viewModel.showApkDownloadDialog.collectAsState()
+    val apkDownloadState by viewModel.apkDownloadState.collectAsState()
 
     val isListening by viewModel.voiceManager.isListening.collectAsState()
     val isSpeaking by viewModel.voiceManager.isSpeaking.collectAsState()
@@ -162,6 +165,7 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                     }
                 },
                 onOpenLanguagePicker = { viewModel.showLanguagePicker(true) },
+                onDownloadApk = { viewModel.startApkDownload() },
                 onCloseDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }
@@ -454,6 +458,18 @@ fun MainAppScreen(viewModel: AiTeacherViewModel) {
                             viewModel.setAppLanguage(lang)
                         },
                         onDismiss = { viewModel.showLanguagePicker(false) }
+                    )
+                }
+
+                // Authentic APK Download & Installation Modal
+                if (showApkDownloadDialog) {
+                    ApkDownloadDialog(
+                        state = apkDownloadState,
+                        viewModel = viewModel,
+                        onDismiss = {
+                            viewModel.showApkDownloadModal(false)
+                            viewModel.resetApkDownload()
+                        }
                     )
                 }
             }

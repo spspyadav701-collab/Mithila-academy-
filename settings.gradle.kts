@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "AI Teacher"
+rootProject.name = "Mithila Academic Darbhanga App"
 
 include(":app")

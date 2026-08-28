@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.local.DownloadedItemEntity
 import com.example.ui.AiTeacherViewModel
 import com.example.ui.AppTab
+import com.example.ui.components.ApkDownloadCard
 import com.example.ui.theme.BluePrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +39,7 @@ fun DownloadsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Offline Downloads",
+                        text = "Downloads & Offline App",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -54,53 +55,79 @@ fun DownloadsScreen(
         containerColor = Color(0xFFF7FAFD),
         modifier = modifier.testTag("downloads_screen")
     ) { innerPadding ->
-        if (downloads.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.CloudDownload,
-                        contentDescription = null,
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "No offline materials downloaded yet.",
-                        color = Color(0xFF64748B),
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Save notes and video lectures to study without internet!",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { viewModel.setTab(AppTab.NOTES) },
-                        colors = ButtonDefaults.buttonColors(containerColor = BluePrimary),
-                        shape = RoundedCornerShape(14.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
+            // App Download APK Card Section
+            item {
+                ApkDownloadCard(
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Section Header: Offline Study Materials
+            item {
+                Text(
+                    text = "OFFLINE STUDY MATERIALS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B),
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                )
+            }
+
+            if (downloads.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Browse Study Notes", fontWeight = FontWeight.Bold)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(44.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "No study notes downloaded yet.",
+                                color = Color(0xFF64748B),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Save notes and video lectures to study anytime without internet!",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { viewModel.setTab(AppTab.NOTES) },
+                                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Browse Study Notes", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
+            } else {
                 items(downloads, key = { it.downloadId }) { item ->
                     DownloadCardItem(
                         item = item,

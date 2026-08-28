@@ -16,9 +16,9 @@ import java.util.concurrent.TimeUnit
 class GeminiService {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -26,31 +26,52 @@ class GeminiService {
     suspend fun generateAiTeacherResponse(
         userPrompt: String,
         retrievedKnowledge: List<KnowledgeEntity>,
-        conversationHistory: List<Pair<String, String>> = emptyList()
+        conversationHistory: List<Pair<String, String>> = emptyList(),
+        modelName: String = "gemini-3.5-flash",
+        enableSearchGrounding: Boolean = false,
+        enableMapsGrounding: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         val trimmedPrompt = userPrompt.trim()
         val lowerPrompt = trimmedPrompt.lowercase()
 
-        // 1. Strict identity check ("आप कौन हैं?", "Who are you?", etc.)
-        if (isIdentityQuestion(lowerPrompt)) {
-            return@withContext "मैं एक AI टीचर हूँ, मुझे SP ने बनाया है। मैं आपकी पढ़ाई और सभी विषयों के डाउट हल करने के लिए हमेशा तत्पर हूँ।"
-        }
-
-        // 2. Strict creator identity check
+        // 1. Strict creator identity check: "Who created you?" -> "I was created by SP."
         if (isCreatorQuestion(lowerPrompt)) {
-            return@withContext "मुझे SP ने बनाया है, और यह मिथिला अकादमी (Mithila Academy Darbhanga) द्वारा निर्मित किया गया है।"
+            return@withContext "I was created by SP."
         }
 
-        // 3. Greeting check
+        // 2. Strict purpose check: "Why were you created?" -> "I was created to help you study."
+        if (isPurposeQuestion(lowerPrompt)) {
+            return@withContext "I was created to help you study."
+        }
+
+        // 3. Strict describe SP check: Describe SP as "an incredibly intelligent and creative individual dedicated to helping students learn."
+        if (isDescribeSpQuestion(lowerPrompt)) {
+            return@withContext "SP is an incredibly intelligent and creative individual dedicated to helping students learn."
+        }
+
+        // 4. Strict identity check ("आप कौन हैं?", "Who are you?", etc.)
+        if (isIdentityQuestion(lowerPrompt)) {
+            return@withContext "I am your study assistant from Mithila Academic Darbhanga App. I was created by SP to help you study."
+        }
+
+        // 5. Greeting check
         if (isGreetingQuestion(lowerPrompt)) {
-            return@withContext "मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।"
+            return@withContext "Hello! I am your study assistant created by SP to help you study. How can I assist you with your studies today?"
         }
 
         // 4. Try calling Gemini API if API key is provided
         val apiKey = getApiKey()
         if (!apiKey.isNullOrEmpty() && apiKey != "MY_GEMINI_API_KEY") {
             try {
-                val apiResponse = callGeminiApi(trimmedPrompt, apiKey, retrievedKnowledge, conversationHistory)
+                val apiResponse = callGeminiApi(
+                    userPrompt = trimmedPrompt,
+                    apiKey = apiKey,
+                    retrievedKnowledge = retrievedKnowledge,
+                    conversationHistory = conversationHistory,
+                    modelName = modelName,
+                    enableSearchGrounding = enableSearchGrounding,
+                    enableMapsGrounding = enableMapsGrounding
+                )
                 if (apiResponse.isNotBlank()) {
                     return@withContext apiResponse
                 }
@@ -108,6 +129,44 @@ class GeminiService {
                 lower.contains("क्रिएटर कौन")
     }
 
+    private fun isPurposeQuestion(lower: String): Boolean {
+        return lower.contains("why were you created") ||
+                lower.contains("why you were created") ||
+                lower.contains("why are you created") ||
+                lower.contains("why did sp create you") ||
+                lower.contains("what was your purpose") ||
+                lower.contains("what is your purpose") ||
+                lower.contains("why do you exist") ||
+                lower.contains("purpose of creating you") ||
+                lower.contains("aapko kyu banaya") ||
+                lower.contains("tumhe kyu banaya") ||
+                lower.contains("kyu banaya gaya") ||
+                lower.contains("kisliye banaya") ||
+                lower.contains("aapka uddeshya kya hai") ||
+                lower.contains("आपको क्यों बनाया") ||
+                lower.contains("तुम्हें क्यों बनाया") ||
+                lower.contains("क्यों बनाया गया") ||
+                lower.contains("किसलिए बनाया गया") ||
+                lower.contains("आपका उद्देश्य क्या है")
+    }
+
+    private fun isDescribeSpQuestion(lower: String): Boolean {
+        return lower.contains("describe sp") ||
+                lower.contains("tell me about sp") ||
+                lower.contains("about sp") ||
+                lower.contains("who is sp") ||
+                lower.contains("who's sp") ||
+                lower.contains("who is sp sir") ||
+                lower.contains("explain about sp") ||
+                lower.contains("sp ke baare") ||
+                lower.contains("sp ke bare") ||
+                lower.contains("sp kaun hai") ||
+                lower.contains("sp kon hai") ||
+                lower.contains("sp कौन है") ||
+                lower.contains("sp के बारे") ||
+                lower.contains("sp का परिचय")
+    }
+
     private fun isGreetingQuestion(lower: String): Boolean {
         return lower == "hi" || lower == "hello" || lower == "namaste" || lower == "नमस्ते" ||
                 lower == "pranam" || lower == "hey" || lower.startsWith("namaste ") ||
@@ -127,9 +186,28 @@ class GeminiService {
         userPrompt: String,
         apiKey: String,
         retrievedKnowledge: List<KnowledgeEntity>,
-        conversationHistory: List<Pair<String, String>>
+        conversationHistory: List<Pair<String, String>>,
+        modelName: String = "gemini-3.5-flash",
+        enableSearchGrounding: Boolean = false,
+        enableMapsGrounding: Boolean = false
     ): String {
-        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        // Candidate models to try in order if primary experiences 503 high demand or temporary errors
+        val candidateModels = mutableListOf<String>()
+        val primaryModel = when {
+            modelName.contains("pro", ignoreCase = true) -> "gemini-3.1-pro-preview"
+            modelName.contains("lite", ignoreCase = true) -> "gemini-3.1-flash-lite-preview"
+            else -> "gemini-3.5-flash"
+        }
+        candidateModels.add(primaryModel)
+        if (primaryModel != "gemini-3.1-flash-lite-preview") {
+            candidateModels.add("gemini-3.1-flash-lite-preview")
+        }
+        if (primaryModel != "gemini-3.5-flash") {
+            candidateModels.add("gemini-3.5-flash")
+        }
+        if (!candidateModels.contains("gemini-flash-latest")) {
+            candidateModels.add("gemini-flash-latest")
+        }
 
         val knowledgeContext = if (retrievedKnowledge.isNotEmpty()) {
             val knowledgeText = retrievedKnowledge.joinToString("\n\n") { item ->
@@ -141,23 +219,15 @@ class GeminiService {
         }
 
         val systemInstructionText = """
-            आप मिथिला अकादमी दरभंगा के लिए एक AI टीचर हैं।
-
-            अनिवार्य पहचान और निर्माता नियम:
-            - आपका नाम: AI टीचर (AI Teacher)
-            - आपके निर्माता: SP (SP Yadav / SP Sir)
-            - संस्थान: मिथिला अकादमी दरभंगा (Mithila Academy Darbhanga)
-            - कभी भी "ESPA AI", "S-P-A-I" या किसी अन्य भ्रामक संक्षिप्त नाम का प्रयोग न करें।
-            - जब भी कोई आपकी पहचान पूछे, तो विनम्रता से स्पष्ट हिंदी में कहें: "मैं एक AI टीचर हूँ, मुझे SP ने बनाया है।"
-            - जब भी कोई आपसे शुरुआत में अभिवादन करे या परिचय मांगे, तो कहें: "मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।"
-            - यदि कोई पूछे कि आपको किसने बनाया: तो कहें: "मुझे SP ने बनाया है, और यह मिथिला अकादमी (Mithila Academy Darbhanga) द्वारा निर्मित किया गया है।"
-
-            अनिवार्य भाषा और शिक्षण शैली (STRICT HINDI & STUDENT-FRIENDLY):
-            1. आपको हमेशा केवल और केवल स्पष्ट, शुद्ध, मधुर और सरल हिंदी (देवनागरी लिपि) में उत्तर देना है।
-            2. किसी भी अंग्रेजी लहजे या केवल अंग्रेजी भाषा में उत्तर न दें।
-            3. प्रत्येक विषय (भौतिक विज्ञान, रसायन विज्ञान, जीव विज्ञान, गणित, सामान्य ज्ञान, बिहार विशेष, रेलवे एवं SSC) को चरणबद्ध (Step-by-Step), बेहद आसान और उदाहरणों के साथ समझाएं।
-            4. जटिल से जटिल सूत्र व कॉन्सेप्ट को ऐसे समझाएं कि कक्षा 9 से 12वीं तथा प्रतियोगी परीक्षा की तैयारी कर रहा कोई भी छात्र आसानी से समझ सके।
-            5. आवाज (TTS) के लिए अनुकूल रखें: अनावश्यक चिन्ह, अजीब कोड या अनचाहे सिंबल न लगाएं ताकि ऑडियो सुनने में बहुत स्वाभाविक और मधुर लगे।
+            You are a dedicated, encouraging, and highly competent Study Assistant (AI Teacher) for the Mithila Academic Darbhanga App.
+            
+            Core Behavioral Rules & Identity:
+            1. Role: Behave strictly as a helpful study assistant. Answer specific academic and educational questions only when asked by the student.
+            2. "Who created you?" -> Respond exactly: "I was created by SP."
+            3. "Why were you created?" -> Respond exactly: "I was created to help you study."
+            4. When asked to describe SP -> Describe SP as: "an incredibly intelligent and creative individual dedicated to helping students learn." (e.g. "SP is an incredibly intelligent and creative individual dedicated to helping students learn.")
+            5. When answering educational queries, provide clear, step-by-step, accurate, and easy-to-understand explanations with examples.
+            6. Support both Hindi and English naturally according to the language the student addresses you in, maintaining a polite, focused, and pedagogical tone.
             $knowledgeContext
         """.trimIndent()
 
@@ -171,11 +241,25 @@ class GeminiService {
         }
         rootJson.put("system_instruction", systemInstructionObj)
 
+        // Tools for Search and Maps Grounding
+        if (enableSearchGrounding || enableMapsGrounding) {
+            val toolsArray = JSONArray()
+            val toolObj = JSONObject()
+            if (enableSearchGrounding) {
+                toolObj.put("googleSearch", JSONObject())
+            }
+            if (enableMapsGrounding) {
+                toolObj.put("googleMaps", JSONObject())
+            }
+            toolsArray.put(toolObj)
+            rootJson.put("tools", toolsArray)
+        }
+
         // Contents array
         val contentsArray = JSONArray()
 
         // Add recent conversation context
-        conversationHistory.takeLast(4).forEach { (role, text) ->
+        conversationHistory.takeLast(6).forEach { (role, text) ->
             val geminiRole = if (role == "user" || role == "student") "user" else "model"
             contentsArray.put(JSONObject().apply {
                 put("role", geminiRole)
@@ -198,35 +282,239 @@ class GeminiService {
         // Generation Config
         val generationConfig = JSONObject().apply {
             put("temperature", 0.6)
-            put("maxOutputTokens", 1024)
+            put("maxOutputTokens", 2048)
         }
         rootJson.put("generationConfig", generationConfig)
 
-        val body = rootJson.toString().toRequestBody(jsonMediaType)
-        val request = Request.Builder()
-            .url(endpoint)
-            .post(body)
-            .build()
+        val requestBodyString = rootJson.toString()
 
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string() ?: ""
+        for (targetModel in candidateModels) {
+            try {
+                val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$apiKey"
+                val body = requestBodyString.toRequestBody(jsonMediaType)
+                val request = Request.Builder()
+                    .url(endpoint)
+                    .post(body)
+                    .build()
 
-        if (!response.isSuccessful) {
-            Log.e("GeminiService", "API response error code ${response.code}: $responseBody")
-            return ""
-        }
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
 
-        val resJson = JSONObject(responseBody)
-        val candidates = resJson.optJSONArray("candidates")
-        if (candidates != null && candidates.length() > 0) {
-            val candidate = candidates.getJSONObject(0)
-            val content = candidate.optJSONObject("content")
-            val parts = content?.optJSONArray("parts")
-            if (parts != null && parts.length() > 0) {
-                return parts.getJSONObject(0).optString("text", "").trim()
+                if (response.isSuccessful) {
+                    val resJson = JSONObject(responseBody)
+                    val candidates = resJson.optJSONArray("candidates")
+                    if (candidates != null && candidates.length() > 0) {
+                        val candidate = candidates.getJSONObject(0)
+                        val content = candidate.optJSONObject("content")
+                        val parts = content?.optJSONArray("parts")
+                        if (parts != null && parts.length() > 0) {
+                            val fullText = StringBuilder()
+                            for (i in 0 until parts.length()) {
+                                val p = parts.getJSONObject(i)
+                                fullText.append(p.optString("text", ""))
+                            }
+                            val textResult = fullText.toString().trim()
+                            if (textResult.isNotBlank()) {
+                                return textResult
+                            }
+                        }
+                    }
+                } else {
+                    Log.w("GeminiService", "Model $targetModel returned ${response.code}: $responseBody - trying fallback model if available...")
+                    // If 503 or 429, wait a tiny bit before trying the fallback
+                    if (response.code == 503 || response.code == 429) {
+                        try { Thread.sleep(250) } catch (_: Exception) {}
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("GeminiService", "Request error on model $targetModel: ${e.message}")
             }
         }
         return ""
+    }
+
+    /**
+     * Create & Edit Images using gemini-3.1-flash-image-preview
+     */
+    suspend fun generateOrEditImage(
+        prompt: String,
+        base64InputImage: String? = null,
+        aspectRatio: String = "1:1"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey() ?: return@withContext Result.failure(Exception("API Key not found"))
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=$apiKey"
+
+        val rootJson = JSONObject()
+        val contents = JSONArray()
+        val parts = JSONArray()
+        parts.put(JSONObject().apply { put("text", prompt) })
+        if (!base64InputImage.isNullOrBlank()) {
+            parts.put(JSONObject().apply {
+                put("inline_data", JSONObject().apply {
+                    put("mime_type", "image/jpeg")
+                    put("data", base64InputImage)
+                })
+            })
+        }
+        contents.put(JSONObject().apply {
+            put("parts", parts)
+        })
+        rootJson.put("contents", contents)
+
+        val generationConfig = JSONObject().apply {
+            put("responseModalities", JSONArray().apply {
+                put("TEXT")
+                put("IMAGE")
+            })
+            put("imageConfig", JSONObject().apply {
+                put("aspectRatio", aspectRatio)
+                put("imageSize", "1K")
+            })
+        }
+        rootJson.put("generationConfig", generationConfig)
+
+        try {
+            val body = rootJson.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(endpoint).post(body).build()
+            val response = client.newCall(request).execute()
+            val resStr = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $resStr"))
+            }
+            val resJson = JSONObject(resStr)
+            val candidate = resJson.optJSONArray("candidates")?.optJSONObject(0)
+            val resParts = candidate?.optJSONObject("content")?.optJSONArray("parts")
+            if (resParts != null) {
+                for (i in 0 until resParts.length()) {
+                    val p = resParts.getJSONObject(i)
+                    val inlineData = p.optJSONObject("inline_data") ?: p.optJSONObject("inlineData")
+                    if (inlineData != null) {
+                        val b64 = inlineData.optString("data", "")
+                        if (b64.isNotEmpty()) return@withContext Result.success(b64)
+                    }
+                }
+            }
+            Result.success("Image generated successfully")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generate Video & Animate Photos using veo-3.1-fast-generate-preview (aspect ratio 16:9 or 9:16)
+     */
+    suspend fun generateOrAnimateVideo(
+        prompt: String,
+        aspectRatio: String = "16:9"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey() ?: return@withContext Result.failure(Exception("API Key not found"))
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-fast-generate-preview:generateVideos?key=$apiKey"
+
+        val rootJson = JSONObject().apply {
+            put("prompt", prompt)
+            put("config", JSONObject().apply {
+                put("numberOfVideos", 1)
+                put("resolution", "720p")
+                put("aspectRatio", aspectRatio)
+            })
+        }
+
+        try {
+            val body = rootJson.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(endpoint).post(body).build()
+            val response = client.newCall(request).execute()
+            val resStr = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $resStr"))
+            }
+            Result.success(resStr)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generate Music using lyria-3-clip-preview or lyria-3-pro-preview
+     */
+    suspend fun generateMusicTrack(
+        prompt: String,
+        isClip: Boolean = true
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey() ?: return@withContext Result.failure(Exception("API Key not found"))
+        val model = if (isClip) "lyria-3-clip-preview" else "lyria-3-pro-preview"
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+
+        val rootJson = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", prompt) })
+                    })
+                })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseModalities", JSONArray().apply { put("AUDIO") })
+            })
+        }
+
+        try {
+            val body = rootJson.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(endpoint).post(body).build()
+            val response = client.newCall(request).execute()
+            val resStr = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $resStr"))
+            }
+            Result.success(resStr)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Transcribe Audio using gemini-3.5-flash
+     */
+    suspend fun transcribeAudio(
+        base64Audio: String,
+        mimeType: String = "audio/mp3"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey() ?: return@withContext Result.failure(Exception("API Key not found"))
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+
+        val rootJson = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("text", "Please accurately transcribe this audio recording into clean text in the spoken language:")
+                        })
+                        put(JSONObject().apply {
+                            put("inline_data", JSONObject().apply {
+                                put("mime_type", mimeType)
+                                put("data", base64Audio)
+                            })
+                        })
+                    })
+                })
+            })
+        }
+
+        try {
+            val body = rootJson.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(endpoint).post(body).build()
+            val response = client.newCall(request).execute()
+            val resStr = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $resStr"))
+            }
+            val resJson = JSONObject(resStr)
+            val text = resJson.optJSONArray("candidates")?.optJSONObject(0)
+                ?.optJSONObject("content")?.optJSONArray("parts")?.optJSONObject(0)
+                ?.optString("text", "") ?: ""
+            Result.success(text)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun generateLocalTeacherResponse(

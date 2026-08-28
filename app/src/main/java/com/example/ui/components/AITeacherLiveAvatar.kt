@@ -137,8 +137,8 @@ fun AITeacherFullScreenLayer(
                 modifier = imageModifier
             )
         } else {
-            Image(
-                painter = painterResource(id = R.drawable.img_mithila_wallpaper),
+            AsyncImage(
+                model = R.drawable.img_mithila_wallpaper,
                 contentDescription = "Mithila Academy AI Teacher",
                 contentScale = ContentScale.Crop,
                 alignment = Alignment.TopCenter,

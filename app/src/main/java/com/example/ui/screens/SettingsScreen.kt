@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppLanguage
 import com.example.ui.AiTeacherViewModel
+import com.example.ui.components.ApkDownloadCard
 import com.example.ui.components.LanguageSelectionDialog
 import com.example.ui.theme.BluePrimary
 import com.example.ui.theme.BlueSecondary
@@ -553,7 +554,15 @@ fun SettingsScreen(
             }
 
             // ==========================================
-            // SECTION 4: APP INFORMATION & CREDITS
+            // SECTION 4: APP DOWNLOAD & APK UPDATES
+            // ==========================================
+            ApkDownloadCard(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // ==========================================
+            // SECTION 5: APP INFORMATION & CREDITS
             // ==========================================
             Card(
                 shape = RoundedCornerShape(20.dp),

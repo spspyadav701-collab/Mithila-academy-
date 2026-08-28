@@ -1,6 +1,6 @@
 {
-  "name": "AI Teacher",
-  "description": "AI Teacher: Modern Educational Learning Platform, Live Classes, Notes, Tests, and AI Doubt Solver by Mithila Academy.",
+  "name": "Mithila Academic Darbhanga App",
+  "description": "Mithila Academic Darbhanga App: AI Study Assistant & Educational Learning Platform created by SP to help students study.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -13,7 +13,7 @@ import coil.util.DebugLogger
  * Custom Application class that optimizes memory, Coil image caching,
  * bitmap pooling, and hardware acceleration across the entire app.
  */
-class Mithila academy Darbhanga Application : Application(), ImageLoaderFactory {
+class SpaApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()

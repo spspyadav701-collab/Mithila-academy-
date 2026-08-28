@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AI Teacher</string>
-    <string name="app_tagline">Mithila Academy • By SP</string>
-    <string name="welcome_greeting">नमस्ते, मैं मिथिला अकादमी द्वारा निर्मित किया गया एक AI टीचर हूँ और मुझे SP ने बनाया है। आपका क्या सवाल है? आप मुझे बताएं, मैं उसका उत्तर अभी देता हूँ।</string>
+    <string name="app_name">Mithila Academic Darbhanga App</string>
+    <string name="app_tagline">Mithila Academic Darbhanga • By SP</string>
+    <string name="welcome_greeting">नमस्ते, मैं आपकी पढ़ाई में मदद करने के लिए बनाया गया एक स्टडी असिस्टेंट (AI Teacher) हूँ। मुझे SP ने बनाया है। आपका क्या सवाल है? आप पूछें, मैं उसका उत्तर अभी देता हूँ।</string>
 </resources>

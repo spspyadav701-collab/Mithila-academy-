@@ -21,6 +21,8 @@ import com.example.data.local.VideoEntity
 import com.example.data.model.AppLanguage
 import com.example.data.repository.ChatSessionRepository
 import com.example.data.service.GeminiService
+import com.example.util.ApkDownloadHelper
+import com.example.util.ApkDownloadState
 import com.example.util.LanguageStrings
 import com.example.util.SecurityHelper
 import com.example.util.VoiceManager
@@ -98,7 +100,36 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
     private val db = AppDatabase.getInstance(application)
     private val geminiService = GeminiService()
     val voiceManager = VoiceManager(application)
+    val apkDownloadHelper = ApkDownloadHelper(application)
     val chatSessionRepository = ChatSessionRepository(db.chatSessionDao())
+
+    val apkDownloadState: StateFlow<ApkDownloadState> = apkDownloadHelper.downloadState
+
+    private val _showApkDownloadDialog = MutableStateFlow(false)
+    val showApkDownloadDialog: StateFlow<Boolean> = _showApkDownloadDialog.asStateFlow()
+
+    fun showApkDownloadModal(show: Boolean) {
+        _showApkDownloadDialog.value = show
+    }
+
+    fun startApkDownload(fileName: String = "MithilaAcademy_v2.6.0.apk") {
+        _showApkDownloadDialog.value = true
+        viewModelScope.launch {
+            apkDownloadHelper.downloadLatestApk(fileName)
+        }
+    }
+
+    fun installDownloadedApk(file: java.io.File) {
+        apkDownloadHelper.installApk(file)
+    }
+
+    fun shareDownloadedApk(file: java.io.File) {
+        apkDownloadHelper.shareApk(file)
+    }
+
+    fun resetApkDownload() {
+        apkDownloadHelper.resetState()
+    }
 
     // Active Navigation Tab - Defaults directly to HOME Screen
     private val _currentTab = MutableStateFlow(AppTab.HOME)
@@ -300,6 +331,35 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
         )
     )
     val chatMessages: StateFlow<List<UiMessage>> = _chatMessages.asStateFlow()
+
+    // Multi-model selection & Grounding (gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite)
+    private val _selectedAiModel = MutableStateFlow("gemini-3.5-flash")
+    val selectedAiModel: StateFlow<String> = _selectedAiModel.asStateFlow()
+
+    private val _enableSearchGrounding = MutableStateFlow(false)
+    val enableSearchGrounding: StateFlow<Boolean> = _enableSearchGrounding.asStateFlow()
+
+    private val _enableMapsGrounding = MutableStateFlow(false)
+    val enableMapsGrounding: StateFlow<Boolean> = _enableMapsGrounding.asStateFlow()
+
+    private val _isLiveVoiceMode = MutableStateFlow(false)
+    val isLiveVoiceMode: StateFlow<Boolean> = _isLiveVoiceMode.asStateFlow()
+
+    fun setSelectedAiModel(model: String) {
+        _selectedAiModel.value = model
+    }
+
+    fun toggleSearchGrounding() {
+        _enableSearchGrounding.value = !_enableSearchGrounding.value
+    }
+
+    fun toggleMapsGrounding() {
+        _enableMapsGrounding.value = !_enableMapsGrounding.value
+    }
+
+    fun toggleLiveVoiceMode() {
+        _isLiveVoiceMode.value = !_isLiveVoiceMode.value
+    }
 
     // --- Visual Learning Progress Tracker State ---
     private val _studentSubjectProgress = MutableStateFlow<List<SubjectProgress>>(
@@ -858,9 +918,9 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } else {
                 val defaultGreeting = UiMessage(
-                    sender = "SPA AI Teacher",
+                    sender = "Study Assistant",
                     role = "ai",
-                    text = "नमस्ते, मैं SPA AI Teacher हूँ। आपकी क्या मदद कर सकता हूँ?",
+                    text = "नमस्ते, मैं आपकी पढ़ाई में सहायता करने के लिए AI Study Assistant हूँ। आपका अध्ययन से जुड़ा क्या सवाल है?",
                     isAi = true,
                     subjectTag = session.subject
                 )
@@ -883,11 +943,11 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun createNewChatSession(subject: String = _selectedSubject.value) {
         val newSessionId = "session_" + UUID.randomUUID().toString().take(8)
-        val initialTitle = if (subject == "All") "New Study Session" else "$subject Doubt Session"
+        val initialTitle = if (subject == "All") "New Study Session" else "$subject Study Session"
         val greeting = UiMessage(
-            sender = "SPA AI Teacher",
+            sender = "Study Assistant",
             role = "ai",
-            text = "नमस्ते, मैं SPA AI Teacher हूँ। ${if (subject != "All") "$subject से संबंधित " else ""}आपकी क्या मदद कर सकता हूँ?",
+            text = "नमस्ते, मैं आपका Study Assistant हूँ। ${if (subject != "All") "$subject से संबंधित " else ""}आपका क्या सवाल है?",
             isAi = true,
             subjectTag = subject
         )
@@ -1024,7 +1084,10 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
                 val aiResponse = geminiService.generateAiTeacherResponse(
                     userPrompt = text,
                     retrievedKnowledge = distinctKnowledge,
-                    conversationHistory = history
+                    conversationHistory = history,
+                    modelName = _selectedAiModel.value,
+                    enableSearchGrounding = _enableSearchGrounding.value,
+                    enableMapsGrounding = _enableMapsGrounding.value
                 )
 
                 val aiMsg = UiMessage(
@@ -1073,6 +1136,52 @@ class AiTeacherViewModel(application: Application) : AndroidViewModel(applicatio
                 )
                 _chatMessages.value = updatedMessages + errorMsg
             }
+        }
+    }
+
+    // --- AI Studio Multimedia Generation ---
+    fun generateAiImage(
+        prompt: String,
+        base64Input: String? = null,
+        aspectRatio: String = "1:1",
+        onResult: (Result<String>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val res = geminiService.generateOrEditImage(prompt, base64Input, aspectRatio)
+            onResult(res)
+        }
+    }
+
+    fun generateAiVideo(
+        prompt: String,
+        aspectRatio: String = "16:9",
+        onResult: (Result<String>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val res = geminiService.generateOrAnimateVideo(prompt, aspectRatio)
+            onResult(res)
+        }
+    }
+
+    fun generateAiMusic(
+        prompt: String,
+        isClip: Boolean = true,
+        onResult: (Result<String>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val res = geminiService.generateMusicTrack(prompt, isClip)
+            onResult(res)
+        }
+    }
+
+    fun transcribeUserAudio(
+        base64Audio: String,
+        mimeType: String = "audio/mp3",
+        onResult: (Result<String>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val res = geminiService.transcribeAudio(base64Audio, mimeType)
+            onResult(res)
         }
     }
 
